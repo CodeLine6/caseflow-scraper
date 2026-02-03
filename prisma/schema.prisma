@@ -1,0 +1,580 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USER & AUTH ====================
+
+model User {
+  id                  String            @id @default(cuid())
+  email               String            @unique
+  password            String
+  name                String
+  avatar              String?
+  specialization      String?
+  contactNumber       String?
+  isActive            Boolean           @default(true)
+  emailVerified       DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  defaultWorkspaceId  String?
+
+  // Relations
+  ownedWorkspaces     Workspace[]       @relation("OwnedWorkspaces")
+  workspaces          WorkspaceMember[] @relation("UserToMember")
+  createdCases        Case[]            @relation("CreatedBy")
+  mainCounselCases    Case[]            @relation("MainCounselForCases")
+  uploadedDocuments   Document[]
+  createdHearings     Hearing[]         @relation("CreatedByHearing")
+  receivedInvitations Invitation[]      @relation("ReceivedInvitations")
+  sentInvitations     Invitation[]      @relation("SentInvitations")
+  createdInvoices     Invoice[]         @relation("CreatedInvoices")
+  notifications       Notification[]
+  assignedTasks       Task[]            @relation("AssignedTasks")
+  createdTasks        Task[]            @relation("CreatedTasks")
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+// ==================== WORKSPACE & RBAC ====================
+
+model Workspace {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String?
+  logo        String?
+  ownerId     String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  owner          User              @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
+  members        WorkspaceMember[] @relation("WorkspaceToMember")
+  cases          Case[]
+  clients        Client[]
+  invitations    Invitation[]
+  invoices       Invoice[]
+  tasks          Task[]
+  auditLogs      AuditLog[]
+  statsSnapshots StatsSnapshot[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id                String              @id @default(cuid())
+  workspaceId       String
+  userId            String
+  role              WorkspaceRole       @default(MEMBER)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  workspace         Workspace           @relation("WorkspaceToMember", fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User                @relation("UserToMember", fields: [userId], references: [id], onDelete: Cascade)
+  customPermissions Permission[]
+  assignedHearings  Hearing[]           @relation("HearingCounsel")
+  hearingAttendance HearingAttendance[]
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model Permission {
+  id          String          @id @default(cuid())
+  action      String          // e.g., "cases.create", "documents.delete"
+  granted     Boolean         @default(true)
+  resourceId  String?         // Optional: for resource-level permissions
+  memberId    String
+  createdAt   DateTime        @default(now())
+
+  // Relations
+  member      WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, action, resourceId])
+  @@map("permissions")
+}
+
+// ==================== AUDIT LOG ====================
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  action      String    // CREATE, UPDATE, DELETE, VIEW, LOGIN, etc.
+  entity      String    // cases, documents, hearings, etc.
+  entityId    String?
+  userId      String
+  workspaceId String?
+  metadata    Json?     // Additional context
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== CLIENTS ====================
+
+model Client {
+  id            String     @id @default(cuid())
+  name          String
+  email         String?
+  contactNumber String?
+  address       String?
+  company       String?
+  clientType    ClientType @default(INDIVIDUAL)
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  workspaceId   String
+
+  // Relations
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases         Case[]
+  invoices      Invoice[]
+
+  @@map("clients")
+}
+
+// ==================== CASES ====================
+
+model Case {
+  id            String       @id @default(cuid())
+  caseNumber    String       @unique
+  title         String
+  description   String?
+  caseCategory  CaseCategory
+  caseType      String       @default("OTHER")
+  status        CaseStatus   @default(ACTIVE)
+  priority      Priority     @default(MEDIUM)
+  opposingParty String?
+  opposingCounsel String?
+  caseValue     Float?
+  filingDate    DateTime
+  closedDate    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  workspaceId   String
+  mainCounselId String?
+  createdById   String
+  courtId       String?
+  clientId      String?
+
+  // Relations
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy     User         @relation("CreatedBy", fields: [createdById], references: [id])
+  mainCounsel   User?        @relation("MainCounselForCases", fields: [mainCounselId], references: [id])
+  court         Court?       @relation(fields: [courtId], references: [id])
+  client        Client?      @relation(fields: [clientId], references: [id])
+  documents     Document[]
+  hearings      Hearing[]
+  updates       CaseUpdate[]
+  tasks         Task[]
+  invoices      Invoice[]
+
+  @@index([workspaceId])
+  @@index([status])
+  @@map("cases")
+}
+
+model CaseUpdate {
+  id          String         @id @default(cuid())
+  caseId      String
+  updateType  CaseUpdateType
+  title       String?
+  description String
+  createdAt   DateTime       @default(now())
+
+  // Relations
+  case        Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("case_updates")
+}
+
+// ==================== COURTS ====================
+
+model Court {
+  id              String    @id @default(cuid())
+  courtName       String    @unique
+  courtType       CourtType
+  address         String?
+  city            String?
+  state           String?
+  displayBoardUrl String?   // URL to the court's online display board
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  cases           Case[]
+  displayBoard    DisplayBoardCache[]
+
+  @@map("courts")
+}
+
+// Display board data cache - stores current court room status
+model DisplayBoardCache {
+  id            String   @id @default(cuid())
+  courtId       String
+  courtNumber   String   // Court room number (e.g., "1", "2", "DB")
+  itemNumber    String?  // Current item being heard
+  caseNumber    String?  // Current case number
+  caseTitle     String?  // Case title/parties
+  status        String?  // e.g., "IN PROGRESS", "BREAK", "RESERVED"
+  judgeName     String?  // Presiding judge name
+  lastUpdated   DateTime @default(now())
+  rawData       Json?    // Store raw scraped data for reference
+
+  // Relations
+  court         Court    @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@unique([courtId, courtNumber])
+  @@index([courtId])
+  @@index([lastUpdated])
+  @@map("display_board_cache")
+}
+
+
+// ==================== HEARINGS ====================
+
+model Hearing {
+  id                String              @id @default(cuid())
+  caseId            String
+  hearingDate       DateTime
+  hearingTime       String?
+  hearingType       HearingType
+  status            HearingStatus       @default(SCHEDULED)
+  description       String?
+  judgeName         String?
+  courtNumber       String
+  courtItemNumber   String?
+  notes             String?
+  outcome           String?
+  orderLink         String?
+  additionalRemarks String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  createdById       String
+  hearingCounselId  String?
+
+  // Relations
+  case              Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy         User                @relation("CreatedByHearing", fields: [createdById], references: [id])
+  hearingCounsel    WorkspaceMember?    @relation("HearingCounsel", fields: [hearingCounselId], references: [id])
+  attendance        HearingAttendance[]
+
+  @@index([caseId])
+  @@index([hearingDate])
+  @@map("hearings")
+}
+
+model HearingAttendance {
+  id        String          @id @default(cuid())
+  hearingId String
+  memberId  String
+  attended  Boolean         @default(false)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Relations
+  hearing   Hearing         @relation(fields: [hearingId], references: [id], onDelete: Cascade)
+  member    WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([hearingId, memberId])
+  @@map("hearing_attendance")
+}
+
+// ==================== DOCUMENTS ====================
+
+model Document {
+  id           String           @id @default(cuid())
+  filename     String
+  originalName String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  documentType DocumentCategory
+  version      Int              @default(1)
+  uploadedById String
+  caseId       String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relations
+  case         Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+
+  @@index([caseId])
+  @@map("documents")
+}
+
+// ==================== TASKS ====================
+
+model Task {
+  id              String     @id @default(cuid())
+  title           String
+  description     String?
+  dueDate         DateTime?
+  priority        Priority   @default(MEDIUM)
+  status          TaskStatus @default(PENDING)
+  completedAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  workspaceId     String
+  caseId          String?
+  assignedToId    String?
+  createdByUserId String
+
+  // Relations
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case            Case?      @relation(fields: [caseId], references: [id])
+  assignedTo      User?      @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdBy       User       @relation("CreatedTasks", fields: [createdByUserId], references: [id])
+
+  @@index([workspaceId])
+  @@index([status])
+  @@map("tasks")
+}
+
+// ==================== INVOICES ====================
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  totalAmount   Float
+  paidAmount    Float         @default(0)
+  status        InvoiceStatus @default(DRAFT)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  workspaceId   String
+  caseId        String?
+  clientId      String?
+  createdById   String
+
+  // Relations
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case          Case?         @relation(fields: [caseId], references: [id])
+  client        Client?       @relation(fields: [clientId], references: [id])
+  createdBy     User          @relation("CreatedInvoices", fields: [createdById], references: [id])
+  items         InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float
+  amount      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  invoiceId   String
+
+  // Relations
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+// ==================== INVITATIONS ====================
+
+model Invitation {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  senderId       String
+  recipientEmail String
+  recipientId    String?
+  role           WorkspaceRole
+  status         InvitationStatus @default(PENDING)
+  token          String           @unique
+  expiresAt      DateTime
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Relations
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sender         User             @relation("SentInvitations", fields: [senderId], references: [id])
+  recipient      User?            @relation("ReceivedInvitations", fields: [recipientId], references: [id])
+
+  @@map("invitations")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+// ==================== ENUMS ====================
+
+enum WorkspaceRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  ASSISTANT
+  INTERN
+}
+
+enum ClientType {
+  INDIVIDUAL
+  CORPORATE
+  GOVERNMENT
+  OTHER
+}
+
+enum CaseCategory {
+  CIVIL
+  CRIMINAL
+  FAMILY
+  CORPORATE
+  TAX
+  LABOR
+  PROPERTY
+  CONSUMER
+  OTHER
+}
+
+enum CaseStatus {
+  ACTIVE
+  PENDING
+  CLOSED
+  APPEALED
+  DISMISSED
+  SETTLED
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum CourtType {
+  DISTRICT
+  HIGH
+  SUPREME
+  TRIBUNAL
+  FAMILY
+  CONSUMER
+  OTHER
+}
+
+enum DocumentCategory {
+  PLEADING
+  EVIDENCE
+  CORRESPONDENCE
+  CONTRACT
+  ORDER
+  JUDGMENT
+  OTHER
+}
+
+enum HearingType {
+  PRELIMINARY
+  EVIDENCE
+  ARGUMENT
+  FINAL
+  INTERIM
+  MOTION
+  OTHER
+}
+
+enum HearingStatus {
+  SCHEDULED
+  COMPLETED
+  POSTPONED
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+  OVERDUE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum CaseUpdateType {
+  STATUS_CHANGE
+  HEARING_UPDATE
+  DOCUMENT_FILED
+  JUDGMENT
+  NOTE
+  OTHER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum NotificationType {
+  INVITATION
+  CASE_UPDATE
+  HEARING_REMINDER
+  TASK_ASSIGNED
+  TASK_DUE
+  GENERAL
+  WORKSPACE_EVENT
+}
+
+// ==================== STATS TRACKING ====================
+
+model StatsSnapshot {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  date              DateTime  @db.Date
+  totalCases        Int       @default(0)
+  activeCases       Int       @default(0)
+  upcomingHearings  Int       @default(0)
+  totalDocuments    Int       @default(0)
+  totalClients      Int       @default(0)
+  pendingTasks      Int       @default(0)
+  createdAt         DateTime  @default(now())
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, date])
+  @@map("stats_snapshots")
+}
