@@ -170,7 +170,7 @@ model Case {
   workspaceId   String
   mainCounselId String?
   createdById   String
-  courtId       String?
+  courtId       Int?
   clientId      String?
 
   // Relations
@@ -207,7 +207,7 @@ model CaseUpdate {
 // ==================== COURTS ====================
 
 model Court {
-  id              String    @id @default(cuid())
+  id              Int       @id @default(autoincrement())
   courtName       String    @unique
   courtType       CourtType
   address         String?
@@ -227,7 +227,7 @@ model Court {
 // Display board data cache - stores current court room status
 model DisplayBoardCache {
   id            String   @id @default(cuid())
-  courtId       String
+  courtId       Int
   courtNumber   String   // Court room number (e.g., "1", "2", "DB")
   itemNumber    String?  // Current item being heard
   caseNumber    String?  // Current case number
