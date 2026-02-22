@@ -10,18 +10,18 @@ datasource db {
 // ==================== USER & AUTH ====================
 
 model User {
-  id                  String            @id @default(cuid())
-  email               String            @unique
-  password            String
-  name                String
-  avatar              String?
-  specialization      String?
-  contactNumber       String?
-  isActive            Boolean           @default(true)
-  emailVerified       DateTime?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  defaultWorkspaceId  String?
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  password           String
+  name               String
+  avatar             String?
+  specialization     String?
+  contactNumber      String?
+  isActive           Boolean   @default(true)
+  emailVerified      DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  defaultWorkspaceId String?
 
   // Relations
   ownedWorkspaces     Workspace[]       @relation("OwnedWorkspaces")
@@ -44,14 +44,14 @@ model User {
 // ==================== WORKSPACE & RBAC ====================
 
 model Workspace {
-  id          String            @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
-  slug        String            @unique
+  slug        String   @unique
   description String?
   logo        String?
   ownerId     String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   owner          User              @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
@@ -68,12 +68,12 @@ model Workspace {
 }
 
 model WorkspaceMember {
-  id                String              @id @default(cuid())
-  workspaceId       String
-  userId            String
-  role              WorkspaceRole       @default(MEMBER)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   // Relations
   workspace         Workspace           @relation("WorkspaceToMember", fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -87,15 +87,15 @@ model WorkspaceMember {
 }
 
 model Permission {
-  id          String          @id @default(cuid())
-  action      String          // e.g., "cases.create", "documents.delete"
-  granted     Boolean         @default(true)
-  resourceId  String?         // Optional: for resource-level permissions
-  memberId    String
-  createdAt   DateTime        @default(now())
+  id         String   @id @default(cuid())
+  action     String // e.g., "cases.create", "documents.delete"
+  granted    Boolean  @default(true)
+  resourceId String? // Optional: for resource-level permissions
+  memberId   String
+  createdAt  DateTime @default(now())
 
   // Relations
-  member      WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([memberId, action, resourceId])
   @@map("permissions")
@@ -104,20 +104,20 @@ model Permission {
 // ==================== AUDIT LOG ====================
 
 model AuditLog {
-  id          String    @id @default(cuid())
-  action      String    // CREATE, UPDATE, DELETE, VIEW, LOGIN, etc.
-  entity      String    // cases, documents, hearings, etc.
+  id          String   @id @default(cuid())
+  action      String // CREATE, UPDATE, DELETE, VIEW, LOGIN, etc.
+  entity      String // cases, documents, hearings, etc.
   entityId    String?
   userId      String
   workspaceId String?
-  metadata    Json?     // Additional context
+  metadata    Json? // Additional context
   ipAddress   String?
   userAgent   String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
   // Relations
-  user        User      @relation(fields: [userId], references: [id])
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
 
   @@index([userId])
   @@index([workspaceId])
@@ -142,9 +142,9 @@ model Client {
   workspaceId   String
 
   // Relations
-  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  cases         Case[]
-  invoices      Invoice[]
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases     Case[]
+  invoices  Invoice[]
 
   @@map("clients")
 }
@@ -152,38 +152,38 @@ model Client {
 // ==================== CASES ====================
 
 model Case {
-  id            String       @id @default(cuid())
-  caseNumber    String       @unique
-  title         String
-  description   String?
-  caseCategory  CaseCategory
-  caseType      String       @default("OTHER")
-  status        CaseStatus   @default(ACTIVE)
-  priority      Priority     @default(MEDIUM)
-  opposingParty String?
+  id              String       @id @default(cuid())
+  caseNumber      String       @unique
+  title           String
+  description     String?
+  caseCategory    CaseCategory
+  caseType        String       @default("OTHER")
+  status          CaseStatus   @default(ACTIVE)
+  priority        Priority     @default(MEDIUM)
+  opposingParty   String?
   opposingCounsel String?
-  caseValue     Float?
-  filingDate    DateTime
-  closedDate    DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  workspaceId   String
-  mainCounselId String?
-  createdById   String
-  courtId       Int?
-  clientId      String?
+  caseValue       Float?
+  filingDate      DateTime
+  closedDate      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  workspaceId     String
+  mainCounselId   String?
+  createdById     String
+  courtId         Int?
+  clientId        String?
 
   // Relations
-  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy     User         @relation("CreatedBy", fields: [createdById], references: [id])
-  mainCounsel   User?        @relation("MainCounselForCases", fields: [mainCounselId], references: [id])
-  court         Court?       @relation(fields: [courtId], references: [id])
-  client        Client?      @relation(fields: [clientId], references: [id])
-  documents     Document[]
-  hearings      Hearing[]
-  updates       CaseUpdate[]
-  tasks         Task[]
-  invoices      Invoice[]
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("CreatedBy", fields: [createdById], references: [id])
+  mainCounsel User?        @relation("MainCounselForCases", fields: [mainCounselId], references: [id])
+  court       Court?       @relation(fields: [courtId], references: [id])
+  client      Client?      @relation(fields: [clientId], references: [id])
+  documents   Document[]
+  hearings    Hearing[]
+  updates     CaseUpdate[]
+  tasks       Task[]
+  invoices    Invoice[]
 
   @@index([workspaceId])
   @@index([status])
@@ -199,7 +199,7 @@ model CaseUpdate {
   createdAt   DateTime       @default(now())
 
   // Relations
-  case        Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@map("case_updates")
 }
@@ -213,32 +213,32 @@ model Court {
   address         String?
   city            String?
   state           String?
-  displayBoardUrl String?   // URL to the court's online display board
+  displayBoardUrl String? // URL to the court's online display board
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  cases           Case[]
-  displayBoard    DisplayBoardCache[]
+  cases        Case[]
+  displayBoard DisplayBoardCache[]
 
   @@map("courts")
 }
 
 // Display board data cache - stores current court room status
 model DisplayBoardCache {
-  id            String   @id @default(cuid())
-  courtId       Int
-  courtNumber   String   // Court room number (e.g., "1", "2", "DB")
-  itemNumber    String?  // Current item being heard
-  caseNumber    String?  // Current case number
-  caseTitle     String?  // Case title/parties
-  status        String?  // e.g., "IN PROGRESS", "BREAK", "RESERVED"
-  judgeName     String?  // Presiding judge name
-  lastUpdated   DateTime @default(now())
-  rawData       Json?    // Store raw scraped data for reference
+  id          String   @id @default(cuid())
+  courtId     Int
+  courtNumber String // Court room number (e.g., "1", "2", "DB")
+  itemNumber  String? // Current item being heard
+  caseNumber  String? // Current case number
+  caseTitle   String? // Case title/parties
+  status      String? // e.g., "IN PROGRESS", "BREAK", "RESERVED"
+  judgeName   String? // Presiding judge name
+  lastUpdated DateTime @default(now())
+  rawData     Json? // Store raw scraped data for reference
 
   // Relations
-  court         Court    @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  court Court @relation(fields: [courtId], references: [id], onDelete: Cascade)
 
   @@unique([courtId, courtNumber])
   @@index([courtId])
@@ -246,16 +246,15 @@ model DisplayBoardCache {
   @@map("display_board_cache")
 }
 
-
 // ==================== HEARINGS ====================
 
 model Hearing {
-  id                String              @id @default(cuid())
+  id                String        @id @default(cuid())
   caseId            String
   hearingDate       DateTime
   hearingTime       String?
   hearingType       HearingType
-  status            HearingStatus       @default(SCHEDULED)
+  status            HearingStatus @default(SCHEDULED)
   description       String?
   judgeName         String?
   courtNumber       String
@@ -264,16 +263,16 @@ model Hearing {
   outcome           String?
   orderLink         String?
   additionalRemarks String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
   createdById       String
   hearingCounselId  String?
 
   // Relations
-  case              Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  createdBy         User                @relation("CreatedByHearing", fields: [createdById], references: [id])
-  hearingCounsel    WorkspaceMember?    @relation("HearingCounsel", fields: [hearingCounselId], references: [id])
-  attendance        HearingAttendance[]
+  case           Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy      User                @relation("CreatedByHearing", fields: [createdById], references: [id])
+  hearingCounsel WorkspaceMember?    @relation("HearingCounsel", fields: [hearingCounselId], references: [id])
+  attendance     HearingAttendance[]
 
   @@index([caseId])
   @@index([hearingDate])
@@ -281,17 +280,17 @@ model Hearing {
 }
 
 model HearingAttendance {
-  id        String          @id @default(cuid())
+  id        String   @id @default(cuid())
   hearingId String
   memberId  String
-  attended  Boolean         @default(false)
+  attended  Boolean  @default(false)
   notes     String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  hearing   Hearing         @relation(fields: [hearingId], references: [id], onDelete: Cascade)
-  member    WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  hearing Hearing         @relation(fields: [hearingId], references: [id], onDelete: Cascade)
+  member  WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([hearingId, memberId])
   @@map("hearing_attendance")
@@ -314,8 +313,8 @@ model Document {
   updatedAt    DateTime         @updatedAt
 
   // Relations
-  case         Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+  case       Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
 
   @@index([caseId])
   @@map("documents")
@@ -339,10 +338,10 @@ model Task {
   createdByUserId String
 
   // Relations
-  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  case            Case?      @relation(fields: [caseId], references: [id])
-  assignedTo      User?      @relation("AssignedTasks", fields: [assignedToId], references: [id])
-  createdBy       User       @relation("CreatedTasks", fields: [createdByUserId], references: [id])
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case       Case?     @relation(fields: [caseId], references: [id])
+  assignedTo User?     @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdBy  User      @relation("CreatedTasks", fields: [createdByUserId], references: [id])
 
   @@index([workspaceId])
   @@index([status])
@@ -368,11 +367,11 @@ model Invoice {
   createdById   String
 
   // Relations
-  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  case          Case?         @relation(fields: [caseId], references: [id])
-  client        Client?       @relation(fields: [clientId], references: [id])
-  createdBy     User          @relation("CreatedInvoices", fields: [createdById], references: [id])
-  items         InvoiceItem[]
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case      Case?         @relation(fields: [caseId], references: [id])
+  client    Client?       @relation(fields: [clientId], references: [id])
+  createdBy User          @relation("CreatedInvoices", fields: [createdById], references: [id])
+  items     InvoiceItem[]
 
   @@map("invoices")
 }
@@ -388,7 +387,7 @@ model InvoiceItem {
   invoiceId   String
 
   // Relations
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("invoice_items")
 }
@@ -409,9 +408,9 @@ model Invitation {
   updatedAt      DateTime         @updatedAt
 
   // Relations
-  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sender         User             @relation("SentInvitations", fields: [senderId], references: [id])
-  recipient      User?            @relation("ReceivedInvitations", fields: [recipientId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sender    User      @relation("SentInvitations", fields: [senderId], references: [id])
+  recipient User?     @relation("ReceivedInvitations", fields: [recipientId], references: [id])
 
   @@map("invitations")
 }
@@ -429,7 +428,7 @@ model Notification {
   createdAt DateTime         @default(now())
 
   // Relations
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, read])
   @@map("notifications")
@@ -511,6 +510,7 @@ enum HearingType {
 
 enum HearingStatus {
   SCHEDULED
+  IN_PROGRESS
   COMPLETED
   POSTPONED
   CANCELLED
@@ -562,18 +562,18 @@ enum NotificationType {
 // ==================== STATS TRACKING ====================
 
 model StatsSnapshot {
-  id                String    @id @default(cuid())
-  workspaceId       String
-  date              DateTime  @db.Date
-  totalCases        Int       @default(0)
-  activeCases       Int       @default(0)
-  upcomingHearings  Int       @default(0)
-  totalDocuments    Int       @default(0)
-  totalClients      Int       @default(0)
-  pendingTasks      Int       @default(0)
-  createdAt         DateTime  @default(now())
+  id               String   @id @default(cuid())
+  workspaceId      String
+  date             DateTime @db.Date
+  totalCases       Int      @default(0)
+  activeCases      Int      @default(0)
+  upcomingHearings Int      @default(0)
+  totalDocuments   Int      @default(0)
+  totalClients     Int      @default(0)
+  pendingTasks     Int      @default(0)
+  createdAt        DateTime @default(now())
 
-  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, date])
   @@map("stats_snapshots")

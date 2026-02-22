@@ -17,6 +17,9 @@ export const config = {
     maxConcurrentScrapers: parseInt(process.env.MAX_CONCURRENT_SCRAPERS || '3', 10),
     puppeteerHeadless: process.env.PUPPETEER_HEADLESS !== 'false',
 
+    // AI (Gemini)
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+
     // Logging
     logLevel: process.env.LOG_LEVEL || 'info',
 }

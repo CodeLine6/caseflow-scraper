@@ -11,6 +11,7 @@
         "db:push": "prisma db push"
     },
     "dependencies": {
+        "@google/generative-ai": "^0.24.1",
         "@prisma/client": "^6.0.0",
         "bullmq": "^5.0.0",
         "cheerio": "^1.0.0",
