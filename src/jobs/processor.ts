@@ -145,8 +145,11 @@ export function startWorker() {
             }
         },
         {
-            ...redisConnection,
-            concurrency: config.maxConcurrentScrapers
+            connection: redisConnection.connection,
+            concurrency: config.maxConcurrentScrapers,
+            lockDuration: 120000, 
+            stalledInterval: 120000,
+            maxStalledCount: 2
         }
     )
 

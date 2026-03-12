@@ -19,6 +19,8 @@ model User {
   contactNumber      String?
   isActive           Boolean   @default(true)
   emailVerified      DateTime?
+  resetToken         String?   @unique
+  resetTokenExpiry   DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   defaultWorkspaceId String?
@@ -41,6 +43,24 @@ model User {
   @@map("users")
 }
 
+model Admin {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  role      AdminRole @default(ADMIN)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("admins")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+}
+
 // ==================== WORKSPACE & RBAC ====================
 
 model Workspace {
@@ -54,15 +74,16 @@ model Workspace {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  owner          User              @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
-  members        WorkspaceMember[] @relation("WorkspaceToMember")
-  cases          Case[]
-  clients        Client[]
-  invitations    Invitation[]
-  invoices       Invoice[]
-  tasks          Task[]
-  auditLogs      AuditLog[]
-  statsSnapshots StatsSnapshot[]
+  owner            User              @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
+  members          WorkspaceMember[] @relation("WorkspaceToMember")
+  cases            Case[]
+  clients          Client[]
+  invitations      Invitation[]
+  invoices         Invoice[]
+  tasks            Task[]
+  auditLogs        AuditLog[]
+  statsSnapshots   StatsSnapshot[]
+  customCaseValues CustomCaseValue[]
 
   @@map("workspaces")
 }
@@ -129,17 +150,18 @@ model AuditLog {
 // ==================== CLIENTS ====================
 
 model Client {
-  id            String     @id @default(cuid())
-  name          String
-  email         String?
-  contactNumber String?
-  address       String?
-  company       String?
-  clientType    ClientType @default(INDIVIDUAL)
-  notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  workspaceId   String
+  id              String     @id @default(cuid())
+  name            String
+  email           String?
+  contactNumber   String?
+  alternateNumber String?
+  address         String?
+  company         String?
+  clientType      ClientType @default(INDIVIDUAL)
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  workspaceId     String
 
   // Relations
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -448,6 +470,7 @@ enum ClientType {
   INDIVIDUAL
   CORPORATE
   GOVERNMENT
+  NGO
   OTHER
 }
 
@@ -577,4 +600,23 @@ model StatsSnapshot {
 
   @@unique([workspaceId, date])
   @@map("stats_snapshots")
+}
+
+// ==================== CUSTOM CASE VALUES ====================
+
+model CustomCaseValue {
+  id          String   @id @default(cuid())
+  fieldType   String // "CATEGORY" or "TYPE"
+  value       String
+  usageCount  Int      @default(1)
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, fieldType, value])
+  @@index([workspaceId, fieldType])
+  @@map("custom_case_values")
 }
